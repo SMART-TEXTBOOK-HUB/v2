@@ -155,77 +155,146 @@ function renderSidebar(isLoggedIn) {
 }
 
 // --- SCANNER & CAMERA ---
-// --- SCANNER & CAMERA (Html5Qrcode) ---
-let html5QrCode;
-
+// --- SCANNER & CAMERA ---
 function initCameraButton() {
-    // We keep the name 'initCameraButton' for compatibility with existing calls, but it initializes the new library.
-    // Ensure we are on the scanner page/view
-    if (!document.getElementById('reader')) return;
+    const video = document.getElementById('video');
+    const startBtn = document.getElementById('btn-start-camera');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    // Prevent double init
-    if (html5QrCode) return;
+    let isCameraStarting = false;
 
-    const startScanner = async () => {
+    if (!video) return;
+
+    const startCamera = async () => {
+        if (isCameraStarting) return;
+        isCameraStarting = true;
+
+        if (startBtn) {
+            startBtn.textContent = "Starting...";
+            startBtn.disabled = true;
+        }
+
         try {
-            html5QrCode = new Html5Qrcode("reader");
-            const config = {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
+            console.log("Attempting to start camera...");
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Browser API not supported. Use HTTPS or Localhost.");
+            }
+
+            let stream;
+            const constraints = {
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    // Attempt to force continuous focus if supported
+                    advanced: [{ focusMode: "continuous" }]
+                }
             };
 
-            await html5QrCode.start(
-                { facingMode: "environment" },
-                config,
-                onScanSuccess,
-                (errorMessage) => {
-                    // parse error, ignore it.
+            try {
+                // Try back camera first with advanced constraints
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err) {
+                console.warn("Advanced constraints failed, trying basic...", err);
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                } catch (err2) {
+                    console.warn("Environment failed, trying any video...", err2);
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 }
-            );
+            }
 
-            // Hide permissions UI if it exists
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true); // Required for iOS
+
+            // Wait for video to be ready
+            await new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    resolve();
+                };
+            });
+
+            await video.play();
+
+            // Hide permission UI
             const permUI = document.querySelector('.camera-permission-ui');
             if (permUI) permUI.classList.add('hidden');
 
-            const startBtn = document.getElementById('btn-start-camera');
             if (startBtn) startBtn.style.display = 'none';
 
-            console.log("Html5Qrcode started.");
             scanning = true;
+            console.log("Camera started successfully.");
+            requestAnimationFrame(() => scanLoop(video, canvas, ctx));
 
-        } catch (err) {
-            console.error("Error starting scanner", err);
-            // alert("Scanner Error: " + err); // Optional
+        } catch (e) {
+            console.error("Camera Start Failed:", e);
+            alert("Camera Error: " + e.message + "\n\nPlease reload or check permissions.");
+
+            if (startBtn) {
+                startBtn.textContent = "Retry Camera";
+                startBtn.disabled = false;
+                startBtn.style.display = 'block';
+            }
+            // Show permission UI again if it was hidden
+            const permUI = document.querySelector('.camera-permission-ui');
+            if (permUI) permUI.classList.remove('hidden');
+
+        } finally {
+            isCameraStarting = false;
         }
     };
 
-    // Auto-start check
+    // Auto-start if on index page
     if (!window.location.pathname.includes('shop.html') &&
         !window.location.pathname.includes('login.html') &&
         !window.location.pathname.includes('cart.html')) {
-        setTimeout(startScanner, 500);
+        // Slight delay to ensure DOM is fully settled
+        setTimeout(startCamera, 500);
     }
 
-    // Manual button support
-    const startBtn = document.getElementById('btn-start-camera');
-    if (startBtn) startBtn.onclick = startScanner;
+    if (startBtn) {
+        startBtn.onclick = startCamera;
+    }
 }
-
-const onScanSuccess = (decodedText, decodedResult) => {
+async function scanLoop(video, canvas, ctx) {
     if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Optimize: Scan only the center 60% of the screen (where the box is)
+        const scanFactor = 0.6;
+        const sWidth = video.videoWidth * scanFactor;
+        const sHeight = video.videoHeight * scanFactor;
+        const sX = (video.videoWidth - sWidth) / 2;
+        const sY = (video.videoHeight - sHeight) / 2;
 
-    console.log(`Code matched = ${decodedText}`, decodedResult);
-    scanning = false; // Pause scanning
+        // Set canvas to smaller size for speed
+        canvas.width = sWidth;
+        canvas.height = sHeight;
 
-    // Optional: Visual feedback or pause the video feed? 
-    // html5QrCode.pause(); // Maybe pause to prevent multiple reads of same code instantly
+        // Draw cropped center frame
+        ctx.drawImage(video, sX, sY, sWidth, sHeight, 0, 0, sWidth, sHeight);
 
-    processScan(decodedText);
-};
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        if (window.jsQR) {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert", // faster, usually standard QR is black on white
+            });
+
+            if (code) {
+                scanning = false;
+                await processScan(code.data);
+                return;
+            }
+        }
+    }
+    requestAnimationFrame(() => scanLoop(video, canvas, ctx));
+}
 
 function resumeScan() {
     scanning = true;
+    const video = document.getElementById('video');
     const canvas = document.createElement('canvas'); // Simplified re-init
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     requestAnimationFrame(() => scanLoop(video, canvas, ctx));

@@ -183,13 +183,27 @@ function initCameraButton() {
             }
 
             let stream;
+            const constraints = {
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    // Attempt to force continuous focus if supported
+                    advanced: [{ focusMode: "continuous" }]
+                }
+            };
+
             try {
-                // Try back camera first
-                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                // Try back camera first with advanced constraints
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch (err) {
-                console.warn("Back camera failed, trying any camera...", err);
-                // Fallback to any available video source
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                console.warn("Advanced constraints failed, trying basic...", err);
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                } catch (err2) {
+                    console.warn("Environment failed, trying any video...", err2);
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                }
             }
 
             video.srcObject = stream;
@@ -247,13 +261,27 @@ function initCameraButton() {
 async function scanLoop(video, canvas, ctx) {
     if (!scanning) return;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
+        // Optimize: Scan only the center 60% of the screen (where the box is)
+        const scanFactor = 0.6;
+        const sWidth = video.videoWidth * scanFactor;
+        const sHeight = video.videoHeight * scanFactor;
+        const sX = (video.videoWidth - sWidth) / 2;
+        const sY = (video.videoHeight - sHeight) / 2;
+
+        // Set canvas to smaller size for speed
+        canvas.width = sWidth;
+        canvas.height = sHeight;
+
+        // Draw cropped center frame
+        ctx.drawImage(video, sX, sY, sWidth, sHeight, 0, 0, sWidth, sHeight);
+
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
         if (window.jsQR) {
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert", // faster, usually standard QR is black on white
+            });
+
             if (code) {
                 scanning = false;
                 await processScan(code.data);

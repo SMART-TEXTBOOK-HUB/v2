@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login / Sign Up</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="login-body">
+
+    <div class="login-wrapper">
+        <h2 class="login-title">Login / Sign Up</h2>
+
+        <form id="auth-form">
+            <div class="input-group">
+                <input type="email" id="email" placeholder="Email, Username, or Mobile" required>
+            </div>
+
+            <div class="input-group">
+                <input type="password" id="password" placeholder="........." required>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="show-password">
+                <label for="show-password">Show Password</label>
+            </div>
+
+            <div class="auth-actions">
+                <button type="button" id="btn-signin" class="btn-auth signin">Sign In</button>
+                <button type="button" id="btn-signup" class="btn-auth signup">Sign Up</button>
+            </div>
+
+            <!-- Auth Feedback Message -->
+            <div id="auth-feedback" class="auth-message"></div>
+
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="index.html" style="color: #666; text-decoration: none; font-size: 0.9rem;">Back to Scanner</a>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="script.js"></script>
+    <script>
+        // Inline UI logic for checkbox
+        const passInput = document.getElementById('password');
+        const showPassBox = document.getElementById('show-password');
+        showPassBox.addEventListener('change', (e) => {
+            passInput.type = e.target.checked ? 'text' : 'password';
+        });
+
+        // Auto-fill handling logic could go here
+    </script>
+</body>
+
+</html>

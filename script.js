@@ -253,40 +253,60 @@ function initCameraButton() {
         // Slight delay to ensure DOM is fully settled
         setTimeout(startCamera, 500);
     }
-
     if (startBtn) {
         startBtn.onclick = startCamera;
     }
 }
+// Initialize Detector if supported
+let barcodeDetector = null;
+if ('BarcodeDetector' in window) {
+    // Supported formats: 'qr_code', 'ean_13', 'upc_a' etc.
+    barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'ean_13', 'code_128'] });
+    console.log("Using Native Barcode Detection API");
+}
+
 async function scanLoop(video, canvas, ctx) {
     if (!scanning) return;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        // Optimize: Scan only the center 60% of the screen (where the box is)
-        const scanFactor = 0.6;
-        const sWidth = video.videoWidth * scanFactor;
-        const sHeight = video.videoHeight * scanFactor;
-        const sX = (video.videoWidth - sWidth) / 2;
-        const sY = (video.videoHeight - sHeight) / 2;
-
-        // Set canvas to smaller size for speed
-        canvas.width = sWidth;
-        canvas.height = sHeight;
-
-        // Draw cropped center frame
-        ctx.drawImage(video, sX, sY, sWidth, sHeight, 0, 0, sWidth, sHeight);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        if (window.jsQR) {
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "dontInvert", // faster, usually standard QR is black on white
-            });
-
-            if (code) {
-                scanning = false;
-                await processScan(code.data);
-                return;
+        try {
+            // STRATEGY A: Native BarcodeDetector (The "Google" one - Fast & Accurate)
+            if (barcodeDetector) {
+                const barcodes = await barcodeDetector.detect(video);
+                if (barcodes.length > 0) {
+                    const code = barcodes[0].rawValue;
+                    if (code) {
+                        scanning = false;
+                        await processScan(code);
+                        return;
+                    }
+                }
             }
+            // STRATEGY B: Legacy jsQR (Fallback)
+            else if (window.jsQR) {
+                // Optimize: Scan only the center 60% of the screen
+                const scanFactor = 0.6;
+                const sWidth = video.videoWidth * scanFactor;
+                const sHeight = video.videoHeight * scanFactor;
+                const sX = (video.videoWidth - sWidth) / 2;
+                const sY = (video.videoHeight - sHeight) / 2;
+
+                canvas.width = sWidth;
+                canvas.height = sHeight;
+                ctx.drawImage(video, sX, sY, sWidth, sHeight, 0, 0, sWidth, sHeight);
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    scanning = false;
+                    await processScan(code.data);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error("Scan Error:", e);
         }
     }
     requestAnimationFrame(() => scanLoop(video, canvas, ctx));

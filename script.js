@@ -275,6 +275,7 @@ function resumeScan() {
 async function processScan(inputCode) {
     // 1. Normalize Code (Trim & Uppercase)
     const codeString = inputCode.trim().toUpperCase();
+    alert("Scanned Code: " + codeString); // Debug Alert as requested
     console.log("Processing code:", codeString);
 
     // 2. Database Lookup
@@ -722,3 +723,4 @@ function initLogin() {
         console.warn("initLogin: Sign Up button NOT found");
     }
 }
+

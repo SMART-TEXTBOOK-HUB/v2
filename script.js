@@ -373,6 +373,7 @@ function startScan() {
     codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
         if (result && scanning) {
             console.log("ZXing Found:", result.text);
+            alert("QR Detected: " + result.text); // DEBUG: Confirm detection
 
             // Debounce/Stop scanning temporarily to process
             scanning = false;
@@ -393,6 +394,9 @@ function resumeScan() {
     // ZXing continues to decode, we just need to flip our flag back
     scanning = true;
 }
+
+// Expose to window for HTML onclick handlers
+window.resumeScan = resumeScan;
 
 async function processScan(inputCode) {
     // 1. Normalize Code (Trim & Uppercase)

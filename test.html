@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Test (ZXing)</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- ZXing Library -->
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
+</head>
+
+<body>
+
+    <main class="scanner-container" style="padding-top: 20px;">
+        <!-- View: Scanner -->
+        <section id="view-scanner" class="view-section active">
+            <div class="scanner-frame" style="margin: 0 auto;">
+                <video id="video" muted playsinline></video>
+                <div class="scan-overlay">
+                    <div class="scan-laser"></div>
+                    <div class="scan-corner tl"></div>
+                    <div class="scan-corner tr"></div>
+                    <div class="scan-corner bl"></div>
+                    <div class="scan-corner br"></div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <h3 style="color: #fff;">ZXing Scanner Test</h3>
+                <p style="color: #aaa;" id="status-text">Initializing...</p>
+                <div id="result-display"
+                    style="color: var(--success); font-weight: bold; font-size: 1.2rem; margin-top: 10px;"></div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        window.onload = function () {
+            const codeReader = new ZXing.BrowserMultiFormatReader();
+            const statusText = document.getElementById('status-text');
+            const resultDisplay = document.getElementById('result-display');
+
+            console.log('ZXing code reader initialized');
+            statusText.textContent = "Requesting Camera...";
+
+            codeReader.listVideoInputDevices()
+                .then((videoInputDevices) => {
+                    if (videoInputDevices.length > 0) {
+                        // Try to find environment camera
+                        const environmentDevice = videoInputDevices.find(device =>
+                            device.label.toLowerCase().includes('back') ||
+                            device.label.toLowerCase().includes('environment')
+                        );
+
+                        const selectedDeviceId = environmentDevice ? environmentDevice.deviceId : videoInputDevices[0].deviceId;
+
+                        statusText.textContent = `Starting camera (Device: ${selectedDeviceId.substr(0, 8)}...)`;
+
+                        codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+                            if (result) {
+                                console.log('Found QR Code:', result.text);
+                                resultDisplay.textContent = result.text;
+                                statusText.textContent = "Scanned!";
+
+                                // Audio Feedback
+                                try {
+                                    const beep = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+                                    beep.play();
+                                } catch (e) { }
+
+                                alert("ZXing Scanned: " + result.text);
+                            }
+                            if (err && !(err instanceof ZXing.NotFoundException)) {
+                                console.error(err);
+                                statusText.textContent = "Error: " + err;
+                            }
+                        });
+                    } else {
+                        console.error('No video input devices found');
+                        statusText.textContent = "No camera found.";
+                        alert("No camera found on this device.");
+                    }
+                })
+                .catch((err) => {
+                    console.error(err);
+                    statusText.textContent = "Error: " + err;
+                    alert("Camera Error: " + err);
+                });
+        };
+    </script>
+
+</body>
+
+</html>

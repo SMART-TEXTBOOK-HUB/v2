@@ -798,6 +798,13 @@ video {
 
     .shop-actions button {
         flex: 1;
-        /* Equal width */
     }
+
+    /* Hide Google Sign In on Mobile */
+    #btn-google-signin {
+        display: none !important;
+    }
+
+    /* Equal width */
+}
 }

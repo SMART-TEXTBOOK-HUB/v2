@@ -154,180 +154,82 @@ function renderSidebar(isLoggedIn) {
     }
 }
 
-// --- SCANNER & CAMERA ---
-// --- SCANNER & CAMERA ---
-function initCameraButton() {
-    const video = document.getElementById('video');
-    const startBtn = document.getElementById('btn-start-camera');
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+// --- SCANNER & CAMERA (ZXing) ---
+let codeReader = null;
+let selectedDeviceId = null;
 
-    let isCameraStarting = false;
+async function initCameraButton() {
+    codeReader = new ZXing.BrowserMultiFormatReader();
+    console.log('ZXing Reader Initialized');
 
-    if (!video) return;
+    try {
+        const videoInputDevices = await codeReader.listVideoInputDevices();
 
-    const startCamera = async () => {
-        if (isCameraStarting) return;
-        isCameraStarting = true;
+        if (videoInputDevices.length > 0) {
+            // Try to auto-select back camera
+            const environmentDevice = videoInputDevices.find(device =>
+                device.label.toLowerCase().includes('back') ||
+                device.label.toLowerCase().includes('environment')
+            );
+            selectedDeviceId = environmentDevice ? environmentDevice.deviceId : videoInputDevices[0].deviceId;
+            console.log(`Selected Camera: ${selectedDeviceId}`);
 
-        if (startBtn) {
-            startBtn.textContent = "Starting...";
-            startBtn.disabled = true;
+            // Auto-start if allowed
+            if (!window.location.pathname.includes('shop.html') &&
+                !window.location.pathname.includes('login.html') &&
+                !window.location.pathname.includes('cart.html')) {
+                startScan();
+            }
+        } else {
+            console.error('No video input devices found');
+            alert("No camera found");
         }
-
-        try {
-            console.log("Attempting to start camera...");
-
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                throw new Error("Browser API not supported. Use HTTPS or Localhost.");
-            }
-
-            let stream;
-            const constraints = {
-                video: {
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    // Attempt to force continuous focus if supported
-                    advanced: [{ focusMode: "continuous" }]
-                }
-            };
-
-            try {
-                // Try back camera first with advanced constraints
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (err) {
-                console.warn("Advanced constraints failed, trying basic...", err);
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                } catch (err2) {
-                    console.warn("Environment failed, trying any video...", err2);
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                }
-            }
-
-            video.srcObject = stream;
-            video.setAttribute("playsinline", true); // Required for iOS
-
-            // Wait for video to be ready
-            await new Promise((resolve) => {
-                video.onloadedmetadata = () => {
-                    resolve();
-                };
-            });
-
-            await video.play();
-
-            // Hide permission UI
-            const permUI = document.querySelector('.camera-permission-ui');
-            if (permUI) permUI.classList.add('hidden');
-
-            if (startBtn) startBtn.style.display = 'none';
-
-            scanning = true;
-            console.log("Camera started successfully.");
-            requestAnimationFrame(() => scanLoop(video, canvas, ctx));
-
-        } catch (e) {
-            console.error("Camera Start Failed:", e);
-            alert("Camera Error: " + e.message + "\n\nPlease reload or check permissions.");
-
-            if (startBtn) {
-                startBtn.textContent = "Retry Camera";
-                startBtn.disabled = false;
-                startBtn.style.display = 'block';
-            }
-            // Show permission UI again if it was hidden
-            const permUI = document.querySelector('.camera-permission-ui');
-            if (permUI) permUI.classList.remove('hidden');
-
-        } finally {
-            isCameraStarting = false;
-        }
-    };
-
-    // Auto-start if on index page
-    if (!window.location.pathname.includes('shop.html') &&
-        !window.location.pathname.includes('login.html') &&
-        !window.location.pathname.includes('cart.html')) {
-        // Slight delay to ensure DOM is fully settled
-        setTimeout(startCamera, 500);
-    }
-    if (startBtn) {
-        startBtn.onclick = startCamera;
+    } catch (err) {
+        console.error(err);
+        alert("Camera Error: " + err);
     }
 }
-// Initialize Detector if supported
-let barcodeDetector = null;
-if ('BarcodeDetector' in window) {
-    // Supported formats: 'qr_code', 'ean_13', 'upc_a' etc.
-    barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'ean_13', 'code_128'] });
-    console.log("Using Native Barcode Detection API");
-}
 
-async function scanLoop(video, canvas, ctx) {
-    if (!scanning) return;
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        try {
-            // STRATEGY A: Native BarcodeDetector (The "Google" one - Fast & Accurate)
-            if (barcodeDetector) {
-                const barcodes = await barcodeDetector.detect(video);
-                if (barcodes.length > 0) {
-                    const code = barcodes[0].rawValue;
-                    if (code) {
-                        scanning = false;
-                        await processScan(code);
-                        return;
-                    }
-                }
-            }
-            // STRATEGY B: Legacy jsQR (Fallback)
-            else if (window.jsQR) {
-                // Optimize: Scan only the center 60% of the screen
-                const scanFactor = 0.6;
-                const sWidth = video.videoWidth * scanFactor;
-                const sHeight = video.videoHeight * scanFactor;
-                const sX = (video.videoWidth - sWidth) / 2;
-                const sY = (video.videoHeight - sHeight) / 2;
+function startScan() {
+    if (!codeReader || !selectedDeviceId) return;
 
-                canvas.width = sWidth;
-                canvas.height = sHeight;
-                ctx.drawImage(video, sX, sY, sWidth, sHeight, 0, 0, sWidth, sHeight);
+    // Hide permission UI if present
+    const permUI = document.querySelector('.camera-permission-ui');
+    if (permUI) permUI.classList.add('hidden');
 
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
-                });
+    scanning = true;
 
-                if (code) {
-                    scanning = false;
-                    await processScan(code.data);
-                    return;
-                }
-            }
-        } catch (e) {
-            console.error("Scan Error:", e);
+    codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+        if (result && scanning) {
+            console.log("ZXing Found:", result.text);
+
+            // Debounce/Stop scanning temporarily to process
+            scanning = false;
+
+            // Audio Feedback
+            try { new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play(); } catch (e) { }
+
+            processScan(result.text);
         }
-    }
-    requestAnimationFrame(() => scanLoop(video, canvas, ctx));
+        if (err && !(err instanceof ZXing.NotFoundException)) {
+            console.warn("ZXing Scan Warning:", err);
+        }
+    });
 }
 
 function resumeScan() {
+    console.log("Resuming Scan...");
+    // ZXing continues to decode, we just need to flip our flag back
     scanning = true;
-    const video = document.getElementById('video');
-    const canvas = document.createElement('canvas'); // Simplified re-init
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    requestAnimationFrame(() => scanLoop(video, canvas, ctx));
 }
 
 async function processScan(inputCode) {
     // 1. Normalize Code (Trim & Uppercase)
     const codeString = inputCode.trim().toUpperCase();
-    alert("Scanned Code: " + codeString); // Debug Alert as requested
     console.log("Processing code:", codeString);
+    // Removed Alert as requested
 
     // 2. Database Lookup
-    // alert("Searching for: " + codeString); // Optional debug
     const { data: item, error } = await supabase.from('items').select('*').eq('code', codeString).single();
 
     if (error || !item) {
@@ -402,8 +304,8 @@ function showQuantityModal(item, callback) {
             <h3 style="margin-bottom:20px;">Enter Quantity</h3>
             <p style="color:#aaa; margin-bottom:10px;">${item.name}</p>
             
-            <input type="number" id="input-qty-${modalId}" value="1" min="1" 
-                style="width:80px; padding:10px; font-size:1.5rem; text-align:center; background:#111; border:1px solid #333; color:fff; border-radius:8px; margin-bottom:20px;">
+            <input type="number" id="input-qty-${modalId}" value="0" min="1" 
+                style="width:80px; padding:10px; font-size:1.5rem; text-align:center; background:#111; border:1px solid #333; color:#ffffff; border-radius:8px; margin-bottom:20px;">
 
             <div style="display:flex; gap:10px;">
                 <button id="btn-add-${modalId}" class="btn btn-primary" style="flex:1;">Add to Cart</button>
@@ -415,18 +317,28 @@ function showQuantityModal(item, callback) {
     document.body.insertAdjacentHTML('beforeend', html);
 
     // Focus input
-    setTimeout(() => document.getElementById(`input-qty-${modalId}`).focus(), 100);
+    setTimeout(() => {
+        const input = document.getElementById(`input-qty-${modalId}`);
+        if (input) {
+            input.focus();
+            input.select(); // Select '0' so user can overwrite instantly
+        }
+    }, 100);
 
     document.getElementById(`btn-add-${modalId}`).onclick = () => {
-        const qty = parseInt(document.getElementById(`input-qty-${modalId}`).value) || 1;
+        const qtyVal = document.getElementById(`input-qty-${modalId}`).value;
+        const qty = parseInt(qtyVal);
+
+        if (isNaN(qty) || qty <= 0) {
+            alert("Please enter a valid quantity (greater than 0).");
+            return;
+        }
+
         document.getElementById(modalId).remove();
         callback(qty);
     };
     document.getElementById(`btn-cancel-${modalId}`).onclick = () => {
         document.getElementById(modalId).remove();
-        // Just cancel, maybe resume scan? callback(null)? 
-        // Here we just close, main loop handles resumeScan if needed, but processScan didn't pass a fail callback for this stage.
-        // Let's assume user cancelling qty means they assume control, so we should resume scan.
         resumeScan();
     };
 }

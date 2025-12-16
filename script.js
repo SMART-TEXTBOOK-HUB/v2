@@ -113,6 +113,32 @@ const waitForSupabase = () => {
     return supabaseReadyPromise;
 };
 
+// Heartbeat: Keep Supabase connection alive
+let heartbeatInterval = null;
+const startHeartbeat = () => {
+    if (heartbeatInterval) return; // Already running
+
+    heartbeatInterval = setInterval(async () => {
+        try {
+            // Lightweight ping - just check session status
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log("[Heartbeat] Ping OK, session:", session ? "Active" : "None");
+        } catch (e) {
+            console.warn("[Heartbeat] Ping failed:", e.message);
+        }
+    }, 5000); // Every 5 seconds
+
+    console.log("[Heartbeat] Started (5s interval)");
+};
+
+const stopHeartbeat = () => {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+        console.log("[Heartbeat] Stopped");
+    }
+};
+
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
     // Optimistic UI: Check LocalStorage immediately to avoid flicker
@@ -131,6 +157,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { data: { session } } = await supabase.auth.getSession();
     supabaseReady = true; // Mark as ready after initial check
     console.log("[Supabase] Initialized, session:", session ? "Active" : "None");
+
+    // Start heartbeat to keep connection alive
+    startHeartbeat();
+
     await handleSessionUpdate(session);
 
     // If on shop.html, render shop UI immediately
@@ -1001,3 +1031,4 @@ function initLogin() {
         console.warn("initLogin: Sign Up button NOT found");
     }
 }
+

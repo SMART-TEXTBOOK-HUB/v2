@@ -6,7 +6,9 @@ import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     signOut,
-    sendPasswordResetEmail
+    sendPasswordResetEmail,
+    verifyPasswordResetCode,
+    confirmPasswordReset
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
     collection,
@@ -21,6 +23,7 @@ import {
     where,
     orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import QrScanner from 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner.min.js';
 
 // --- STATE ---
 let currentUser = null;
@@ -68,6 +71,22 @@ window.Auth = {
     resetPassword: async (email) => {
         try {
             await sendPasswordResetEmail(auth, email);
+            return { success: true };
+        } catch (error) {
+            return { error: error.message };
+        }
+    },
+    verifyResetCode: async (code) => {
+        try {
+            const email = await verifyPasswordResetCode(auth, code);
+            return { success: true, email };
+        } catch (error) {
+            return { error: error.message };
+        }
+    },
+    confirmReset: async (code, newPassword) => {
+        try {
+            await confirmPasswordReset(auth, code, newPassword);
             return { success: true };
         } catch (error) {
             return { error: error.message };
@@ -181,88 +200,72 @@ async function loadUserShop() {
     }
 }
 
-// --- SCANNER (ZXing) ---
-let codeReader = null;
-let selectedDeviceId = null;
+// --- SCANNER (Nimiq QrScanner) ---
+let qrScanner = null;
 
 async function initScanner() {
-    if (typeof ZXing === 'undefined') {
-        console.log("ZXing not loaded. Skipping camera init.");
+    console.log("Initializing Nimiq QrScanner...");
+
+    // Config worker path if not native
+    // QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
+
+    const videoEl = document.getElementById('video');
+    if (!videoEl) {
+        console.error("Video element not found!");
         return;
     }
 
-    codeReader = new ZXing.BrowserMultiFormatReader();
-    console.log('ZXing Reader Initialized');
+    // Initialize Scanner
+    // Nimiq QrScanner automatically checks for BarcodeDetector support and uses it if available.
+    qrScanner = new QrScanner(
+        videoEl,
+        result => {
+            console.log('Decoded:', result);
+            if (scanning) {
+                // Audio Feedback
+                try { new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play(); } catch (e) { }
+                scanning = false;
+                processScan(typeof result === 'object' ? result.data : result);
+            }
+        },
+        {
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+            // Preferred facing mode is handled by constraints usually, but library has 'preferredCamera'
+            returnDetailedScanResult: true
+        }
+    );
 
     try {
-        const videoInputDevices = await codeReader.listVideoInputDevices();
+        await qrScanner.start();
+        console.log("Scanner started.");
+        scanning = true;
 
-        if (videoInputDevices.length > 0) {
-            // Try to auto-select back camera
-            const environmentDevice = videoInputDevices.find(device =>
-                device.label.toLowerCase().includes('back') ||
-                device.label.toLowerCase().includes('environment')
-            );
-            selectedDeviceId = environmentDevice ? environmentDevice.deviceId : videoInputDevices[0].deviceId;
-            console.log(`Selected Camera: ${selectedDeviceId}`);
+        // Log if using native
+        const hasCamera = await QrScanner.hasCamera();
+        console.log("Has Camera:", hasCamera);
 
-            startScan();
-        } else {
-            console.error('No video input devices found');
-            alert("No camera found");
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Camera Error: " + err);
+    } catch (e) {
+        console.error("Failed to start scanner:", e);
+        alert("Camera failed: " + e);
     }
 }
 
 function startScan() {
-    if (!codeReader) return;
-
-    // Check if video element exists
-    const videoEl = document.getElementById('video');
-    if (!videoEl) return;
-
-    scanning = true;
-
-    // Helper to start decoding
-    const startDecoding = (deviceId) => {
-        console.log(`[Scanner] Attempting to start with Device ID: ${deviceId || 'Default'}`);
-        codeReader.decodeFromVideoDevice(deviceId, 'video', (result, err) => {
-            if (result && scanning) {
-                console.log("[Scanner] SUCCESS! Found:", result.text);
-
-                // Audio Feedback
-                try { new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play(); } catch (e) { }
-
-                scanning = false; // Debounce
-                processScan(result.text);
-            }
-        }).then(() => {
-            console.log("[Scanner] Camera started successfully.");
-        }).catch((err) => {
-            console.error("[Scanner] Start Failed:", err);
-            // If specific device failed, try default/undefined
-            if (deviceId && deviceId === selectedDeviceId) {
-                console.warn("[Scanner] Retrying with default camera...");
-                startDecoding(undefined);
-            } else {
-                alert("Camera failed to start: " + err.message + ". Please refresh or check permissions.");
-            }
-        });
-    };
-
-    startDecoding(selectedDeviceId);
+    if (qrScanner) {
+        qrScanner.start().then(() => {
+            scanning = true;
+        }).catch(e => console.error("Start error:", e));
+    }
 }
 
-// Window resumeScan was already defined above, but we need to ensure it flips flag
 window.resumeScan = () => {
     console.log("Resuming Scan...");
     scanning = true;
+    if (qrScanner) qrScanner.start(); // Ensure it's running
 };
 
-// Override the processScan to use the new logic
+// Override the processScan (same logic, just ensuring clean code)
 async function processScan(code) {
     const cleanCode = code.trim().toUpperCase();
     console.log("Processing code:", cleanCode);

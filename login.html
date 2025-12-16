@@ -124,18 +124,8 @@
             forgotFeedback.textContent = "";
 
             try {
-                // Reuse Supabase client from script.js (exposed globally)
-                // Wait for script.js to load if needed
-                if (!window.supabaseClient) {
-                    const SUPABASE_URL = 'https://suwbojgdhcpuaqmiqmkg.supabase.co';
-                    const SUPABASE_ANON_KEY = 'sb_publishable_Cd3s159DP-FKWCWmnHHA8w_hi9_7wh_';
-                    const { createClient } = window.supabase;
-                    window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                }
-
-                const { error } = await window.supabaseClient.auth.resetPasswordForEmail(email, {
-                    redirectTo: window.location.origin + '/forget-password.html'
-                });
+                // Use window.Auth from script.js
+                const { success, error } = await window.Auth.resetPassword(email);
 
                 if (error) {
                     throw error;

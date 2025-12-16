@@ -8,7 +8,9 @@ import {
     signOut,
     sendPasswordResetEmail,
     verifyPasswordResetCode,
-    confirmPasswordReset
+    confirmPasswordReset,
+    GoogleAuthProvider,
+    signInWithPopup
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
     collection,
@@ -38,6 +40,20 @@ window.Auth = {
         try {
             await signInWithEmailAndPassword(auth, email, password);
             // successful login will trigger onAuthStateChanged
+            return { success: true };
+        } catch (error) {
+            return { error: error.message };
+        }
+    },
+    signInWithGoogle: async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            // Check if new user -> create shop
+            // For simplicity, we just check if shop exists on auth change (existing logic handles this)
+
+            // We can explicitly create shop if needed here, but onAuthStateChanged logic 
+            // calls loadUserShop which creates it if missing.
             return { success: true };
         } catch (error) {
             return { error: error.message };
@@ -361,6 +377,7 @@ function initLoginUI() {
     // Login Page Logic
     const btnSignIn = document.getElementById('btn-signin');
     const btnSignUp = document.getElementById('btn-signup');
+    const btnGoogle = document.getElementById('btn-google-signin');
     const emailInput = document.getElementById('email');
     const passInput = document.getElementById('password');
     const feedback = document.getElementById('auth-feedback');
@@ -376,6 +393,23 @@ function initLoginUI() {
             } else {
                 feedback.textContent = "Success!";
                 feedback.className = "auth-message success";
+                setTimeout(() => window.location.href = 'index.html', 1000);
+            }
+        };
+    }
+
+    if (btnGoogle) {
+        btnGoogle.onclick = async () => {
+            feedback.textContent = "Connecting to Google...";
+            feedback.className = "auth-message";
+            const res = await window.Auth.signInWithGoogle();
+            if (res.error) {
+                feedback.textContent = res.error;
+                feedback.className = "auth-message error";
+            } else {
+                feedback.textContent = "Success!";
+                feedback.className = "auth-message success";
+                // Redirect handled by auth listener, but we can do it here too
                 setTimeout(() => window.location.href = 'index.html', 1000);
             }
         };

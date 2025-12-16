@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login / Sign Up</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="login-body">
+
+    <div class="login-wrapper">
+        <h2 class="login-title">Login / Sign Up</h2>
+
+        <form id="auth-form">
+            <div class="input-group">
+                <input type="email" id="email" placeholder="Email, Username, or Mobile" required>
+            </div>
+
+            <div class="input-group">
+                <input type="password" id="password" placeholder="........." required>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="show-password">
+                <label for="show-password">Show Password</label>
+            </div>
+
+            <div class="auth-actions">
+                <button type="button" id="btn-signin" class="btn-auth signin">Sign In</button>
+                <button type="button" id="btn-signup" class="btn-auth signup">Sign Up</button>
+            </div>
+
+            <!-- Forgot Password Link -->
+            <div style="margin-top: 15px; text-align: center;">
+                <a href="#" id="btn-forgot-password"
+                    style="color: #6b8afd; text-decoration: none; font-size: 0.9rem;">Forgot Password?</a>
+            </div>
+
+            <!-- Auth Feedback Message -->
+            <div id="auth-feedback" class="auth-message"></div>
+
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="index.html" style="color: #666; text-decoration: none; font-size: 0.9rem;">Back to Scanner</a>
+            </div>
+        </form>
+
+        <!-- Forgot Password Modal (inline) -->
+        <div id="forgot-modal"
+            style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center;">
+            <div class="login-wrapper" style="max-width: 350px; width: 90%; animation: fadeIn 0.3s ease;">
+                <h3 style="margin-bottom: 20px;">Reset Password</h3>
+                <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 20px;">Enter your email address and we'll send
+                    you a link to reset your password.</p>
+
+                <div class="input-group">
+                    <input type="email" id="forgot-email" placeholder="Email Address" required>
+                </div>
+
+                <div id="forgot-feedback" class="auth-message"></div>
+
+                <div class="auth-actions" style="margin-top: 15px;">
+                    <button type="button" id="btn-send-reset" class="btn-auth signin" style="width: 100%;">Send Reset
+                        Link</button>
+                </div>
+
+                <div style="margin-top: 15px; text-align: center;">
+                    <a href="#" id="btn-close-forgot"
+                        style="color: #666; text-decoration: none; font-size: 0.9rem;">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="script.js"></script>
+    <script>
+        // Inline UI logic for checkbox
+        const passInput = document.getElementById('password');
+        const showPassBox = document.getElementById('show-password');
+        showPassBox.addEventListener('change', (e) => {
+            passInput.type = e.target.checked ? 'text' : 'password';
+        });
+
+        // Forgot Password Modal Logic
+        const forgotModal = document.getElementById('forgot-modal');
+        const btnForgot = document.getElementById('btn-forgot-password');
+        const btnCloseForgot = document.getElementById('btn-close-forgot');
+        const btnSendReset = document.getElementById('btn-send-reset');
+        const forgotEmail = document.getElementById('forgot-email');
+        const forgotFeedback = document.getElementById('forgot-feedback');
+
+        // Open modal
+        btnForgot.addEventListener('click', (e) => {
+            e.preventDefault();
+            forgotModal.style.display = 'flex';
+            forgotEmail.focus();
+        });
+
+        // Close modal
+        btnCloseForgot.addEventListener('click', (e) => {
+            e.preventDefault();
+            forgotModal.style.display = 'none';
+            forgotFeedback.textContent = '';
+        });
+
+        // Send Reset Link
+        btnSendReset.addEventListener('click', async () => {
+            const email = forgotEmail.value.trim();
+
+            if (!email) {
+                forgotFeedback.textContent = "Please enter your email address.";
+                forgotFeedback.className = "auth-message error";
+                return;
+            }
+
+            btnSendReset.textContent = "Sending...";
+            btnSendReset.disabled = true;
+            forgotFeedback.textContent = "";
+
+            try {
+                // Reuse Supabase client from script.js (exposed globally)
+                // Wait for script.js to load if needed
+                if (!window.supabaseClient) {
+                    const SUPABASE_URL = 'https://suwbojgdhcpuaqmiqmkg.supabase.co';
+                    const SUPABASE_ANON_KEY = 'sb_publishable_Cd3s159DP-FKWCWmnHHA8w_hi9_7wh_';
+                    const { createClient } = window.supabase;
+                    window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                }
+
+                const { error } = await window.supabaseClient.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin + '/forget-password.html'
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                forgotFeedback.textContent = "Reset link sent! Check your email.";
+                forgotFeedback.className = "auth-message success";
+                btnSendReset.textContent = "Sent!";
+
+                // Close modal after delay
+                setTimeout(() => {
+                    forgotModal.style.display = 'none';
+                    forgotFeedback.textContent = '';
+                    btnSendReset.textContent = "Send Reset Link";
+                    btnSendReset.disabled = false;
+                }, 3000);
+
+            } catch (e) {
+                console.error("Reset Password Error:", e);
+                forgotFeedback.textContent = "Error: " + (e.message || e);
+                forgotFeedback.className = "auth-message error";
+                btnSendReset.textContent = "Send Reset Link";
+                btnSendReset.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

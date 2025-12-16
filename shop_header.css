@@ -1,0 +1,56 @@
+/* Shop Header Layout */
+.shop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 25px;
+}
+
+.shop-title-group .shop-id-label {
+    font-size: 0.9rem;
+    color: #888;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.shop-title-group .shop-id-label .highlight {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.shop-title-group h2 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.shop-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.shop-actions button {
+    width: auto;
+}
+
+.table-container {
+    background: transparent;
+    padding: 0;
+}
+
+/* Mobile Adjustments for Shop Header */
+@media screen and (max-width: 768px) {
+    .shop-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .shop-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .shop-actions button {
+        flex: 1;
+    }
+}

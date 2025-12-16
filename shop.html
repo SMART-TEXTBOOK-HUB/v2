@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Shop</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body
+    style="padding-top: 80px; display: flex; align-items: center; justify-content: start; flex-direction: column; overflow-y: auto !important; position: static !important;">
+
+    <!-- Reuse Top Right Auth from Index (optional, or just a Back button) -->
+    <!-- User requested this page specifically for the table. Let's add a clear Back button. -->
+
+    <div class="glass-auth-container" id="top-right-nav">
+        <a href="index.html" class="btn-glass-blue">Back to Scanner</a>
+        <button id="btn-top-signout" class="btn-glass-blue"
+            style="background:var(--danger) !important; margin-left:10px;">Sign Out</button>
+    </div>
+
+    <!-- Shop Content Container -->
+    <div id="shop-content" class="shop-wrapper glass-panel"
+        style="width: 90%; max-width: 800px; padding: 20px; margin-top: 20px;">
+        <!-- Table will be rendered here by JS -->
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

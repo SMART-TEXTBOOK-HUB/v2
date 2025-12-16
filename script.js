@@ -350,8 +350,7 @@ function addItem(item, qty) {
     } else {
         cart.push({ ...item, qty });
     }
-    // Show feedback or open cart automatically? Let's just update and notify.
-    alert(`Added ${qty} x ${item.name} to cart.`);
+
     renderCart(); // Update underlying HTML but don't force open modal yet if user wants to scan more
 }
 

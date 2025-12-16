@@ -270,12 +270,6 @@ async function processScan(code) {
     const cleanCode = code.trim().toUpperCase();
     console.log("Processing code:", cleanCode);
 
-    if (!currentUser) {
-        alert("Please Login to scan products.");
-        window.resumeScan();
-        return;
-    }
-
     try {
         const q = query(collection(db, "Items"), where("code", "==", cleanCode));
         const querySnapshot = await getDocs(q);
@@ -305,7 +299,7 @@ async function processScan(code) {
         console.error("Scan Error Details:", e);
 
         if (e.code === 'permission-denied') {
-            const msg = "Database Locked! Update Firestore Rules to 'allow read, write: if request.auth != null;'";
+            const msg = "Database Locked! For public scanning, set Firestore Rules to: match /Items/{doc} { allow read: if true; }";
             alert(msg);
         } else if (e.code === 'unavailable') {
             alert("Network error: Cannot reach server.");

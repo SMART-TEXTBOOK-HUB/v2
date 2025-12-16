@@ -270,6 +270,12 @@ async function processScan(code) {
     const cleanCode = code.trim().toUpperCase();
     console.log("Processing code:", cleanCode);
 
+    if (!currentUser) {
+        alert("Please Login to scan products.");
+        window.resumeScan();
+        return;
+    }
+
     try {
         const q = query(collection(db, "Items"), where("code", "==", cleanCode));
         const querySnapshot = await getDocs(q);
@@ -296,8 +302,17 @@ async function processScan(code) {
         });
 
     } catch (e) {
-        console.error("Scan Error:", e);
-        alert("Error looking up product.");
+        console.error("Scan Error Details:", e);
+
+        if (e.code === 'permission-denied') {
+            const msg = "Database Locked! Update Firestore Rules to 'allow read, write: if request.auth != null;'";
+            alert(msg);
+        } else if (e.code === 'unavailable') {
+            alert("Network error: Cannot reach server.");
+        } else {
+            alert("Error looking up product: " + e.message);
+        }
+
         window.resumeScan();
     }
 }
@@ -736,3 +751,4 @@ function generateHexId(length) {
     for (let i = 0; i < length; i++) result += characters.charAt(Math.floor(Math.random() * characters.length));
     return result;
 }
+

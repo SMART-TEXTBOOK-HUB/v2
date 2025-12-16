@@ -362,17 +362,35 @@ async function initCameraButton() {
 }
 
 function startScan() {
-    if (!codeReader || !selectedDeviceId) return;
+    console.log("[Scanner] startScan() called");
+    console.log("[Scanner] codeReader:", codeReader);
+    console.log("[Scanner] selectedDeviceId:", selectedDeviceId);
+
+    if (!codeReader || !selectedDeviceId) {
+        console.error("[Scanner] ABORT: codeReader or deviceId missing!");
+        return;
+    }
+
+    // Check if video element exists
+    const videoEl = document.getElementById('video');
+    console.log("[Scanner] Video element:", videoEl);
+
+    if (!videoEl) {
+        console.error("[Scanner] ABORT: No video element found!");
+        return;
+    }
 
     // Hide permission UI if present
     const permUI = document.querySelector('.camera-permission-ui');
     if (permUI) permUI.classList.add('hidden');
 
     scanning = true;
+    console.log("[Scanner] Starting decode... scanning =", scanning);
 
     codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+        // Log every callback to confirm it's running
         if (result && scanning) {
-            console.log("ZXing Found:", result.text);
+            console.log("[Scanner] SUCCESS! Found:", result.text);
             alert("QR Detected: " + result.text); // DEBUG: Confirm detection
 
             // Debounce/Stop scanning temporarily to process
@@ -384,9 +402,11 @@ function startScan() {
             processScan(result.text);
         }
         if (err && !(err instanceof ZXing.NotFoundException)) {
-            console.warn("ZXing Scan Warning:", err);
+            console.warn("[Scanner] Error:", err);
         }
     });
+
+    console.log("[Scanner] decodeFromVideoDevice() started");
 }
 
 function resumeScan() {

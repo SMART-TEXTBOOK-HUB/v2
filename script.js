@@ -257,13 +257,54 @@ async function initScanner() {
         console.log("Scanner started.");
         scanning = true;
 
-        // Log if using native
+        // --- POLYFILL CHECK ---
+        // The library might export to window.BarcodeDetector or window.barcodeDetector
+        if (typeof BarcodeDetector === 'undefined') {
+            if (window.barcodeDetector && window.barcodeDetector.BarcodeDetector) {
+                window.BarcodeDetector = window.barcodeDetector.BarcodeDetector;
+            } else if (window.BarcodeDetectorPolyfill) {
+                window.BarcodeDetector = window.BarcodeDetectorPolyfill;
+            }
+        }
+
+        // Log Support Status
         const hasCamera = await QrScanner.hasCamera();
+        const hasDetector = (typeof BarcodeDetector !== 'undefined');
         console.log("Has Camera:", hasCamera);
+        console.log("Barcode Detector API Available:", hasDetector);
+
+        if (hasDetector) {
+            try {
+                const formats = await BarcodeDetector.getSupportedFormats();
+                console.log("Supported Formats:", formats.join(', '));
+                if (formats.includes('code_128')) {
+                    console.log("SUCCESS: Code 128 support detected!");
+                } else {
+                    console.warn("Code 128 NOT in supported formats list.");
+                }
+            } catch (err) {
+                console.warn("Could not retrieve supported formats:", err);
+            }
+        } else {
+            console.error("Barcode Detector NOT found. Code 128 scanning will not work. Falling back to QR-only software decoding.");
+            alert("Barcode scanning (Code 128) requires an HTTPS connection or a compatible browser. Falling back to QR codes only.");
+        }
+
+        // Environment Checks
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            console.error("CAMERA ACCESS ERROR: Browser requires HTTPS for camera on mobile/external domains.");
+            alert("Security Error: Scanner requires HTTPS to access camera on this device.");
+        }
 
     } catch (e) {
         console.error("Failed to start scanner:", e);
-        alert("Camera failed: " + e);
+        if (e.toString().includes("Permission denied")) {
+            alert("Camera Permission Denied!");
+        } else if (e.toString().includes("https")) {
+            alert("Security Error: Scanner requires HTTPS connection.");
+        } else {
+            alert("Scanner error: " + e);
+        }
     }
 }
 
@@ -779,4 +820,3 @@ function generateHexId(length) {
     for (let i = 0; i < length; i++) result += characters.charAt(Math.floor(Math.random() * characters.length));
     return result;
 }
-
